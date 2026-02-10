@@ -73,7 +73,7 @@ func _fit_face() -> void:
 	print("[CARD] tex=", tex_size, " scale=", face.scale)
 
 func _update_shadow() -> void:
-	shadow.position = shadow_offset.rotated(-face.rotation)
+	shadow.position = shadow_offset.rotated(-face.global_rotation)
 
 func _update_tilt(delta: float) -> void:
 	if face_mat == null:
@@ -134,6 +134,9 @@ func drag_logic(delta: float) -> void:
 			drag_grab_offset = global_position - get_global_mouse_position()
 		is_dragging = true
 		MouseBrain.node_being_dragged = self
+		var p := get_parent()
+		if p != null and p.has_method("update_cards"):
+			p.call_deferred("update_cards")
 		var target: Vector2 = get_global_mouse_position() + drag_grab_offset
 		global_position = global_position.lerp(target, 22.0 * delta)
 		z_index = 100

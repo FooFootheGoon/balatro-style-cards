@@ -1,17 +1,19 @@
-[gd_scene load_steps=2 format=3 uid="uid://co5w8lk5o2fbt"]
+[gd_scene load_steps=3 format=3 uid="uid://co5w8lk5o2fbt"]
 
 [ext_resource type="PackedScene" uid="uid://d1urynih8ert2" path="res://scenes/card.tscn" id="1_6e84v"]
+[ext_resource type="PackedScene" uid="uid://dxy2wn4epwwfm" path="res://scenes/hand.tscn" id="2_4dvvg"]
 
 [node name="Node2D" type="Node2D"]
 
 [node name="Card" parent="." instance=ExtResource("1_6e84v")]
-offset_left = 100.0
-offset_top = 183.0
-offset_right = 340.0
-offset_bottom = 519.0
+offset_left = 12.0
+offset_top = 4.0
+offset_right = 252.0
+offset_bottom = 340.0
 
-[node name="Card2" parent="." instance=ExtResource("1_6e84v")]
-offset_left = 434.0
-offset_top = 185.0
-offset_right = 674.0
-offset_bottom = 521.0
+[node name="Hand" parent="." instance=ExtResource("2_4dvvg")]
+offset_left = 215.0
+offset_top = 543.0
+offset_right = 1115.0
+offset_bottom = 903.0
+y_min_px = 66.0

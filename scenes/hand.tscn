@@ -1,0 +1,25 @@
+[gd_scene load_steps=5 format=3 uid="uid://dxy2wn4epwwfm"]
+
+[ext_resource type="Script" uid="uid://p18ytw54l2e8" path="res://scripts/hand.gd" id="1_cmdsa"]
+[ext_resource type="PackedScene" uid="uid://d1urynih8ert2" path="res://scenes/card.tscn" id="2_k7pjy"]
+
+[sub_resource type="Curve" id="Curve_m1v21"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.5, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_kdemd"]
+
+[node name="Hand" type="Control"]
+custom_minimum_size = Vector2(900, 360)
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("1_cmdsa")
+card_scene = ExtResource("2_k7pjy")
+y_curve = SubResource("Curve_m1v21")
+rot_curve = SubResource("Curve_kdemd")
