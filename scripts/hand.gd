@@ -48,12 +48,14 @@ func update_cards() -> void:
 		var y_p: float = 0.0
 		if y_curve != null:
 			y_p = y_curve.sample(t)
-		var r_p: float = 0.0
+		var r_norm: float = 0.5
 		if rot_curve != null:
-			r_p = rot_curve.sample(t)
-		var x: float = offset_x + (float(i) * (card_w + final_sep))
-		var y: float = y_min_px - (y_max_px * y_p)
+			r_norm = rot_curve.sample(t)
+		var r_p: float = (r_norm * 2.0) - 1.0
 		var rot_deg: float = max_rot_deg * r_p
+		var x: float = offset_x + (float(i) * (card_w + final_sep))
+		var base_y: float = size.y - card_size_px.y
+		var y: float = base_y + y_min_px - (y_max_px * y_p)
 		var c := cards[i] as Control
 		if c == null:
 			continue

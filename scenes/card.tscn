@@ -31,12 +31,21 @@ offset_bottom = 148.0
 pivot_offset = Vector2(120, 168)
 script = ExtResource("1_6u4wf")
 
-[node name="Face" type="Sprite2D" parent="."]
+[node name="Visual" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Face" type="Sprite2D" parent="Visual"]
 material = SubResource("ShaderMaterial_sy11y")
 position = Vector2(120, 168)
 texture = ExtResource("2_ktuci")
 
-[node name="Shadow" type="Sprite2D" parent="Face"]
+[node name="Shadow" type="Sprite2D" parent="Visual/Face"]
 modulate = Color(0, 0, 0, 0.3019608)
 show_behind_parent = true
 material = SubResource("ShaderMaterial_ktuci")

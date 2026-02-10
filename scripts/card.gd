@@ -1,8 +1,9 @@
 extends Control
 
 @export var card_size := Vector2(210, 294)
-@onready var face: Sprite2D = $Face
-@onready var shadow: Sprite2D = $Face/Shadow
+@onready var visual: Control = $Visual
+@onready var face: Sprite2D = $Visual/Face
+@onready var shadow: Sprite2D = $Visual/Face/Shadow
 
 var shadow_offset: Vector2 = Vector2(-12, 12)
 var mouse_in: bool = false
@@ -30,7 +31,8 @@ var shadow_tilt_mult: float = 0.85
 func _ready() -> void:
 	custom_minimum_size = card_size
 	size = card_size
-	pivot_offset = size * 0.5
+	pivot_offset = Vector2(size.x * 0.5, size.y)
+	visual.pivot_offset = pivot_offset
 	_fit_face()
 	if face.material != null:
 		face.material = face.material.duplicate()
@@ -73,7 +75,7 @@ func _fit_face() -> void:
 	print("[CARD] tex=", tex_size, " scale=", face.scale)
 
 func _update_shadow() -> void:
-	shadow.position = shadow_offset.rotated(-face.global_rotation)
+	shadow.position = shadow_offset.rotated(-(rotation + visual.rotation))
 
 func _update_tilt(delta: float) -> void:
 	if face_mat == null:
@@ -148,7 +150,7 @@ func drag_logic(delta: float) -> void:
 		if MouseBrain.node_being_dragged == self:
 			MouseBrain.node_being_dragged = null
 		z_index = 0
-		face.rotation_degrees = lerpf(face.rotation_degrees, 0.0, 12.0 * delta)
+		visual.rotation_degrees = lerpf(visual.rotation_degrees, 0.0, 12.0 * delta)
 		last_global_pos = global_position
 
 func polish_logic() -> void:
@@ -165,7 +167,7 @@ func polish_logic() -> void:
 		return
 	change_scale(idle_scale_mult)
 	# Idle state: ensure visuals settle back cleanly
-	face.rotation_degrees = lerpf(face.rotation_degrees, 0.0, 12.0 * get_physics_process_delta_time())
+	visual.rotation_degrees = lerpf(visual.rotation_degrees, 0.0, 12.0 * get_physics_process_delta_time())
 
 func change_scale(desired_mult: float) -> void:
 	if is_equal_approx(desired_mult, current_goal_scale):
@@ -182,5 +184,5 @@ func change_scale(desired_mult: float) -> void:
 func _set_rotation(delta: float) -> void:
 	var x_delta: float = global_position.x - last_global_pos.x
 	var desired: float = clampf(x_delta * 0.85, -max_card_rotation, max_card_rotation)
-	face.rotation_degrees = lerpf(face.rotation_degrees, desired, 12.0 * delta)
+	visual.rotation_degrees = lerpf(visual.rotation_degrees, desired, 12.0 * delta)
 	last_global_pos = global_position

@@ -12,8 +12,8 @@ offset_right = 252.0
 offset_bottom = 340.0
 
 [node name="Hand" parent="." instance=ExtResource("2_4dvvg")]
-offset_left = 215.0
-offset_top = 543.0
-offset_right = 1115.0
-offset_bottom = 903.0
-y_min_px = 66.0
+offset_left = 274.0
+offset_top = 218.0
+offset_right = 1174.0
+offset_bottom = 578.0
+y_min_px = 90.0
