@@ -1,0 +1,25 @@
+[gd_scene load_steps=4 format=3 uid="uid://co5w8lk5o2fbt"]
+
+[ext_resource type="Script" uid="uid://kk45cnq0ovpu" path="res://scripts/table.gd" id="1_x8522"]
+[ext_resource type="PackedScene" uid="uid://d1urynih8ert2" path="res://scenes/card.tscn" id="2_olh0b"]
+[ext_resource type="PackedScene" uid="uid://dxy2wn4epwwfm" path="res://scenes/hand.tscn" id="3_u03e6"]
+
+[node name="Table" type="Node2D"]
+script = ExtResource("1_x8522")
+hand_path = NodePath("Hand")
+deck_visual_path = NodePath("Card")
+card_scene = ExtResource("2_olh0b")
+starting_deck_size = 52
+
+[node name="Card" parent="." instance=ExtResource("2_olh0b")]
+offset_left = 12.0
+offset_top = 4.0
+offset_right = 252.0
+offset_bottom = 340.0
+
+[node name="Hand" parent="." instance=ExtResource("3_u03e6")]
+offset_left = 219.0
+offset_top = 543.0
+offset_right = 1119.0
+offset_bottom = 903.0
+y_min_px = 90.0

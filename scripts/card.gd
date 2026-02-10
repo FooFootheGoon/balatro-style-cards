@@ -27,6 +27,7 @@ var drag_tilt_deg_per_px: float = 0.35
 var drag_grab_offset: Vector2 = Vector2.ZERO
 var shadow_mat: ShaderMaterial = null
 var shadow_tilt_mult: float = 0.85
+var is_dealing: bool = false
 
 func _ready() -> void:
 	custom_minimum_size = card_size
@@ -126,6 +127,8 @@ func _physics_process(delta: float) -> void:
 	polish_logic()
 
 func drag_logic(delta: float) -> void:
+	if is_dealing:
+		return
 	if not mouse_in and not is_dragging:
 		return
 	if MouseBrain.node_being_dragged != null and MouseBrain.node_being_dragged != self:
@@ -154,6 +157,10 @@ func drag_logic(delta: float) -> void:
 		last_global_pos = global_position
 
 func polish_logic() -> void:
+	if is_dealing:
+		z_index = 150
+		change_scale(idle_scale_mult)
+		return
 	if is_dragging:
 		z_index = 100
 		change_scale(drag_scale_mult)
@@ -186,3 +193,6 @@ func _set_rotation(delta: float) -> void:
 	var desired: float = clampf(x_delta * 0.85, -max_card_rotation, max_card_rotation)
 	visual.rotation_degrees = lerpf(visual.rotation_degrees, desired, 12.0 * delta)
 	last_global_pos = global_position
+
+func set_dealing(value: bool) -> void:
+	is_dealing = value
