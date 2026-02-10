@@ -1,0 +1,37 @@
+[gd_scene load_steps=5 format=3 uid="uid://d1urynih8ert2"]
+
+[ext_resource type="Script" uid="uid://mire5ktwi3u1" path="res://scripts/card.gd" id="1_6u4wf"]
+[ext_resource type="Shader" uid="uid://bjv7eosluq6pl" path="res://fake_3D.gdshader" id="2_kg30u"]
+[ext_resource type="Texture2D" uid="uid://bn8wjmp6ltv5h" path="res://art/parchment med.png" id="2_ktuci"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sy11y"]
+shader = ExtResource("2_kg30u")
+shader_parameter/rect_size = Vector2(0, 0)
+shader_parameter/fov = 90.0
+shader_parameter/cull_back = true
+shader_parameter/y_rot = 0.0
+shader_parameter/x_rot = 0.0
+shader_parameter/inset = 0.0
+
+[node name="Card" type="Control"]
+custom_minimum_size = Vector2(240, 336)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 94.0
+offset_bottom = 148.0
+pivot_offset = Vector2(120, 168)
+script = ExtResource("1_6u4wf")
+
+[node name="Face" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_sy11y")
+position = Vector2(120, 168)
+texture = ExtResource("2_ktuci")
+
+[node name="Shadow" type="Sprite2D" parent="Face"]
+modulate = Color(0, 0, 0, 0.3019608)
+show_behind_parent = true
+scale = Vector2(1.03, 1.03)
+texture = ExtResource("2_ktuci")
+
+[connection signal="mouse_entered" from="." to="." method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="." to="." method="_on_mouse_exited"]

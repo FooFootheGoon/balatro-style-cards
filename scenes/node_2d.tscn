@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3 uid="uid://co5w8lk5o2fbt"]
+
+[ext_resource type="PackedScene" uid="uid://d1urynih8ert2" path="res://scenes/card.tscn" id="1_6e84v"]
+
+[node name="Node2D" type="Node2D"]
+
+[node name="Card" parent="." instance=ExtResource("1_6e84v")]
+offset_left = 100.0
+offset_top = 183.0
+offset_right = 340.0
+offset_bottom = 519.0
+
+[node name="Card2" parent="." instance=ExtResource("1_6e84v")]
+offset_left = 434.0
+offset_top = 185.0
+offset_right = 674.0
+offset_bottom = 521.0
