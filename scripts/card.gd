@@ -23,6 +23,9 @@ var tilt_last_pos: Vector2 = Vector2.ZERO
 var hover_tilt_max_deg: float = 8.0
 var drag_tilt_max_deg: float = 18.0
 var drag_tilt_deg_per_px: float = 0.35
+var drag_grab_offset: Vector2 = Vector2.ZERO
+var shadow_mat: ShaderMaterial = null
+var shadow_tilt_mult: float = 0.85
 
 func _ready() -> void:
 	custom_minimum_size = card_size
@@ -40,6 +43,15 @@ func _ready() -> void:
 		face_mat.set_shader_parameter("fov", 90.0)
 		face_mat.set_shader_parameter("cull_back", true)
 		print("[CARD_3D] rect_size=", face.texture.get_size(), " inset=0.12")
+	if shadow != null:
+		if face_mat != null:
+			shadow.material = face_mat.duplicate()
+		elif shadow.material != null:
+			shadow.material = shadow.material.duplicate()
+		shadow_mat = shadow.material as ShaderMaterial
+		if shadow_mat != null:
+			shadow_mat.set_shader_parameter("cull_back", false)
+		print("[CARD_SHADOW] mat_ok=", shadow_mat != null)
 	last_global_pos = global_position
 	base_face_scale = face.scale
 	shadow.position = shadow_offset
@@ -91,6 +103,10 @@ func _update_tilt(delta: float) -> void:
 	tilt_current = tilt_current.lerp(target, tilt_lerp_speed * delta)
 	face_mat.set_shader_parameter("x_rot", tilt_current.x)
 	face_mat.set_shader_parameter("y_rot", tilt_current.y)
+	if shadow_mat != null:
+		shadow_mat.set_shader_parameter("x_rot", tilt_current.x * shadow_tilt_mult)
+		shadow_mat.set_shader_parameter("y_rot", tilt_current.y * shadow_tilt_mult)
+
 
 
 func _on_mouse_entered() -> void:
@@ -115,9 +131,10 @@ func drag_logic(delta: float) -> void:
 	if Input.is_action_pressed("Lclick"):
 		if not is_dragging:
 			print("[CARD_DRAG] start")
+			drag_grab_offset = global_position - get_global_mouse_position()
 		is_dragging = true
 		MouseBrain.node_being_dragged = self
-		var target: Vector2 = get_global_mouse_position() - (size * 0.5)
+		var target: Vector2 = get_global_mouse_position() + drag_grab_offset
 		global_position = global_position.lerp(target, 22.0 * delta)
 		z_index = 100
 		_set_rotation(delta)
