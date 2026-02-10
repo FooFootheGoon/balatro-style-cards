@@ -1,0 +1,4 @@
+cd /home/deck/Godot/Balatro-style_cards/
+git add -A
+git commit -m "Push notes"
+git push
