@@ -36,18 +36,29 @@ func get_layout_for_index(index: int, count: int) -> Dictionary:
 		final_sep = (hand_w - (card_w * count)) / float(count - 1)
 		combined_w = hand_w
 	var offset_x: float = (hand_w - combined_w) * 0.5
-	var t: float = 0.5
+	var t01: float = 0.5
 	if count > 1:
-		t = float(index) / float(count - 1)
+		t01 = float(index) / float(count - 1)
 	var y_p: float = 0.0
 	if y_curve != null:
-		y_p = y_curve.sample(t)
-	var r_p: float = 0.0
-	if rot_curve != null:
-		r_p = rot_curve.sample(t)
+		y_p = y_curve.sample(t01)
 	var x: float = offset_x + (float(index) * (card_w + final_sep))
 	var y: float = y_min_px - (y_max_px * y_p)
-	var rot_deg: float = max_rot_deg * r_p
+	var t_signed: float = 0.0
+	if count > 1:
+		t_signed = (t01 * 2.0) - 1.0
+	var s: float = 0.0
+	if t_signed < 0.0:
+		s = -1.0
+	elif t_signed > 0.0:
+		s = 1.0
+	var t_abs: float = t_signed
+	if t_abs < 0.0:
+		t_abs = -t_abs
+	var r_mag: float = 0.0
+	if rot_curve != null:
+		r_mag = rot_curve.sample(t_abs)
+	var rot_deg: float = s * max_rot_deg * r_mag
 	return {"pos": Vector2(x, y), "rot_deg": rot_deg, "sep": final_sep}
 
 func layout_cards_animated(duration: float = 0.22, skip: Control = null) -> Tween:
@@ -56,6 +67,21 @@ func layout_cards_animated(duration: float = 0.22, skip: Control = null) -> Twee
 	if count == 0:
 		return null
 	var dragged := MouseBrain.node_being_dragged
+	var has_targets: bool = false
+	for i in range(count):
+		var c := cards[i] as Control
+		if c == null:
+			continue
+		if c == dragged:
+			continue
+		if skip != null and c == skip:
+			continue
+		has_targets = true
+		break
+	if not has_targets:
+		print("[HAND_FIX] layout_cards_animated: no targets, count=", count)
+		return null
+	
 	var tw := create_tween()
 	tw.set_ease(Tween.EASE_OUT)
 	tw.set_trans(Tween.TRANS_QUAD)
@@ -70,7 +96,7 @@ func layout_cards_animated(duration: float = 0.22, skip: Control = null) -> Twee
 		var layout := get_layout_for_index(i, count)
 		tw.parallel().tween_property(c, "position", layout["pos"], duration)
 		tw.parallel().tween_property(c, "rotation_degrees", layout["rot_deg"], duration)
-	print("[HAND] tween_layout count=", count, " sep=", get_layout_for_index(0, count)["sep"], " dur=", duration)
+	print("[HAND_FIX] tween_layout targets_ok count=", count, " dur=", duration)
 	return tw
 
 func update_cards() -> void:
@@ -96,4 +122,4 @@ func update_cards() -> void:
 		var layout := get_layout_for_index(i, count)
 		c.position = layout["pos"]
 		c.rotation_degrees = layout["rot_deg"]
-		print("[HAND] updated count=", count, " sep=", get_layout_for_index(0, count)["sep"])
+	print("[HAND] updated count=", count, " sep=", get_layout_for_index(0, count)["sep"])

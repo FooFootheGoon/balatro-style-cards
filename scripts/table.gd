@@ -40,19 +40,20 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func deal_one() -> void:
 	if _is_dealing:
-		print("[DECK] draw blocked: dealing")
+		print("[DECK_FIX] draw blocked: dealing")
 		return
 	if deck.is_empty():
-		print("[DECK] empty")
+		print("[DECK_FIX] empty")
 		return
 	if hand == null or deck_visual == null or card_scene == null:
-		print("[DECK] missing refs hand/deck_visual/card_scene")
+		print("[DECK_FIX] missing refs hand/deck_visual/card_scene")
 		return
 	_is_dealing = true
+	print("[DECK_FIX] draw_start deck_left_before=", deck.size(), " hand_before=", hand.get_child_count())
 	var id: int = int(deck.pop_back())
 	var c := card_scene.instantiate() as Control
 	if c == null:
-		print("[DECK] instantiate failed")
+		print("[DECK_FIX] instantiate failed")
 		_is_dealing = false
 		return
 	if c.has_method("set_dealing"):
@@ -66,9 +67,8 @@ func deal_one() -> void:
 	var layout: Dictionary = hand.call("get_layout_for_index", index, count)
 	var end_pos: Vector2 = layout.get("pos", Vector2.ZERO)
 	var end_rot: float = float(layout.get("rot_deg", 0.0))
-	var shift_tw_var = hand.call("layout_cards_animated", 0.22, c)
-	var shift_tw: Tween = shift_tw_var as Tween
-	var fly_tw := create_tween()
+	hand.call("layout_cards_animated", 0.22, c)
+	var fly_tw: Tween = c.create_tween()
 	fly_tw.set_ease(Tween.EASE_OUT)
 	fly_tw.set_trans(Tween.TRANS_QUAD)
 	var start_pos: Vector2 = c.position
@@ -76,26 +76,26 @@ func deal_one() -> void:
 	fly_tw.tween_property(c, "position", mid_pos, 0.10)
 	fly_tw.tween_property(c, "position", end_pos, 0.12)
 	fly_tw.parallel().tween_property(c, "rotation_degrees", end_rot, 0.22)
-	print("[DECK] deal id=", id, " deck_left=", deck.size(), " hand_count=", count)
-	var pending := {"n": 1}
-	if shift_tw != null:
-		pending["n"] = 2
-	var finish := func() -> void:
-		pending["n"] = int(pending["n"]) - 1
-		if int(pending["n"]) > 0:
-			return
-		if is_instance_valid(c) and c.has_method("set_dealing"):
+	print("[DECK_FIX] deal id=", id, " deck_left_after=", deck.size(), " hand_now=", count)
+	var t0: int = Time.get_ticks_msec()
+	while is_instance_valid(fly_tw) and fly_tw.is_running() and (Time.get_ticks_msec() - t0) < 1200:
+		await get_tree().process_frame
+	if is_instance_valid(fly_tw) and fly_tw.is_running():
+		print("[DECK_FIX] fly tween timeout, snapping")
+		fly_tw.kill()
+	if is_instance_valid(c):
+		c.position = end_pos
+		c.rotation_degrees = end_rot
+		if c.has_method("set_dealing"):
 			c.set_dealing(false)
-		_is_dealing = false
-		hand.call("update_cards")
-		print("[DECK] deal_done hand_count=", hand.get_child_count())
-	if shift_tw != null:
-		shift_tw.finished.connect(finish)
-	else:
-		finish.call()
-	fly_tw.finished.connect(finish)
+	_is_dealing = false
+	hand.call("update_cards")
+	print("[DECK_FIX] draw_done hand_now=", hand.get_child_count())
 
 func discard_one() -> void:
+	if _is_dealing:
+		print("[DECK] discard blocked: dealing")
+		return
 	if hand == null:
 		return
 	var count: int = hand.get_child_count()
@@ -112,3 +112,9 @@ func discard_one() -> void:
 	last.queue_free()
 	hand.call("layout_cards_animated", 0.18, null)
 	print("[DECK] discard id=", id, " discard_count=", discard.size(), " hand_count=", hand.get_child_count())
+
+func _settle_hand_after_deal() -> void:
+	await get_tree().create_timer(0.26).timeout
+	if hand != null and not _is_dealing:
+		hand.call("update_cards")
+		print("[DECK_FIX] settle_hand")
