@@ -165,25 +165,35 @@ func drag_logic(delta: float) -> void:
 		if not is_dragging:
 			print("[CARD_DRAG] start")
 			drag_grab_offset = global_position - get_global_mouse_position()
+			rotation_degrees = 0.0
+			visual.rotation_degrees = 0.0
 			last_global_pos = global_position
-		is_dragging = true
-		MouseBrain.node_being_dragged = self
-		var p := get_parent()
-		if p != null and p.has_method("update_cards"):
-			p.call_deferred("update_cards")
+			is_dragging = true
+			MouseBrain.node_being_dragged = self
+			var p := get_parent()
+			if p != null and p.has_method("layout_cards_animated"):
+				p.call("layout_cards_animated", 0.12, self)
+		if not is_dragging:
+			return
+		rotation_degrees = 0.0
+		visual.rotation_degrees = 0.0
 		var target: Vector2 = get_global_mouse_position() + drag_grab_offset
 		global_position = global_position.lerp(target, 22.0 * delta)
 		z_index = 100
-		_set_rotation(delta)
 	else:
 		if is_dragging:
 			print("[CARD_DRAG] stop")
+		if not is_dragging:
+			return
 		is_dragging = false
 		if MouseBrain.node_being_dragged == self:
 			MouseBrain.node_being_dragged = null
 		z_index = 0
-		drag_rot_target = 0.0
+		visual.rotation_degrees = 0.0
 		last_global_pos = global_position
+		var p := get_parent()
+		if p != null and p.has_method("layout_cards_animated"):
+			p.call("layout_cards_animated", 0.18, null)
 
 func polish_logic() -> void:
 	if is_dealing:

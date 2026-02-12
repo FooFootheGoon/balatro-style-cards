@@ -16,6 +16,8 @@ extends Control
 
 var _wave_t: float = 0.0
 var _wave_paused_until_ms: int = 0
+var _drag_last_index: int = -1
+var _drag_preview_tw: Tween	
 
 func draw_card() -> void:
 	if card_scene == null:
@@ -70,6 +72,8 @@ func get_layout_for_index(index: int, count: int) -> Dictionary:
 	return {"pos": Vector2(x, y), "rot_deg": rot_deg, "sep": final_sep}
 
 func layout_cards_animated(duration: float = 0.22, skip: Control = null) -> Tween:
+	if has_method("pause_wave"):
+		call("pause_wave", duration + 0.06)
 	var cards: Array[Node] = get_children()
 	var count: int = cards.size()
 	if count == 0:
@@ -89,7 +93,6 @@ func layout_cards_animated(duration: float = 0.22, skip: Control = null) -> Twee
 	if not has_targets:
 		print("[HAND_FIX] layout_cards_animated: no targets, count=", count)
 		return null
-	
 	var tw := create_tween()
 	tw.set_ease(Tween.EASE_OUT)
 	tw.set_trans(Tween.TRANS_QUAD)
@@ -125,7 +128,7 @@ func update_cards() -> void:
 		var layout := get_layout_for_index(i, count)
 		c.position = layout["pos"]
 		c.rotation_degrees = layout["rot_deg"]
-	print("[HAND] updated count=", count, " sep=", get_layout_for_index(0, count)["sep"])
+		c.set_meta("_wave_off_y", 0.0)
 
 func pause_wave(seconds: float) -> void:
 	var until_ms: int = Time.get_ticks_msec() + int(maxf(0.0, seconds) * 1000.0)
@@ -134,21 +137,54 @@ func pause_wave(seconds: float) -> void:
 func _process(delta: float) -> void:
 	if not wave_enabled:
 		return
-	if Time.get_ticks_msec() < _wave_paused_until_ms:
-		return
 	var cards: Array[Node] = get_children()
 	var count: int = cards.size()
 	if count <= 0:
 		return
-	var dragged := MouseBrain.node_being_dragged
+	var dragged := MouseBrain.node_being_dragged as Control
+	if dragged != null and dragged.get_parent() == self:
+		var x_center: float = dragged.position.x + (dragged.size.x * 0.5)
+		var target_index: int = 0
+		for i in range(count):
+			var layout_i: Dictionary = get_layout_for_index(i, count)
+			var slot_center: float = layout_i["pos"].x + (dragged.size.x * 0.5)
+			if x_center > slot_center:
+				target_index = i + 1
+		target_index = clampi(target_index, 0, count - 1)
+		if target_index != _drag_last_index:
+			_drag_last_index = target_index
+			if dragged.get_index() != target_index:
+				move_child(dragged, target_index)
+			if _drag_preview_tw != null and is_instance_valid(_drag_preview_tw) and _drag_preview_tw.is_running():
+				_drag_preview_tw.kill()
+			pause_wave(0.20)
+			_drag_preview_tw = layout_cards_animated(0.12, dragged)
+		_wave_t += delta
+		for i in range(count):
+			var c := cards[i] as Control
+			if c == null:
+				continue
+			if c == dragged:
+				continue
+			if c.has_method("set_dealing") and bool(c.get("is_dealing")):
+				continue
+			var prev_off: float = 0.0
+			if c.has_meta("_wave_off_y"):
+				prev_off = float(c.get_meta("_wave_off_y"))
+			var base_y: float = c.position.y - prev_off
+			var phase: float = (_wave_t * TAU * wave_freq_hz) + (float(i) * wave_phase_step)
+			var new_off: float = sin(phase) * wave_amp_px
+			c.position = Vector2(c.position.x, base_y + new_off)
+			c.set_meta("_wave_off_y", new_off)
+		return
+	_drag_last_index = -1
+	if Time.get_ticks_msec() < _wave_paused_until_ms:
+		return
 	var pause_now: bool = false
 	for i in range(count):
 		var c := cards[i] as Control
 		if c == null:
 			continue
-		if c == dragged:
-			pause_now = true
-			break
 		if bool(c.get("mouse_in")):
 			pause_now = true
 			break
@@ -160,13 +196,12 @@ func _process(delta: float) -> void:
 			var c := cards[i] as Control
 			if c == null:
 				continue
-			if c == dragged:
-				continue
 			if c.has_method("set_dealing") and bool(c.get("is_dealing")):
 				continue
 			var layout: Dictionary = get_layout_for_index(i, count)
 			c.position = layout["pos"]
 			c.rotation_degrees = layout["rot_deg"]
+			c.set_meta("_wave_off_y", 0.0)
 		return
 	_wave_t += delta
 	for i in range(count):
@@ -178,3 +213,4 @@ func _process(delta: float) -> void:
 		var phase: float = (_wave_t * TAU * wave_freq_hz) + (float(i) * wave_phase_step)
 		c.position = Vector2(base.x, base.y + (sin(phase) * wave_amp_px))
 		c.rotation_degrees = layout["rot_deg"]
+		c.set_meta("_wave_off_y", 0.0)
