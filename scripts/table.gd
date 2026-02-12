@@ -4,7 +4,14 @@ extends Node2D
 @export var deck_visual_path: NodePath
 @export var card_scene: PackedScene
 @export var starting_deck_size: int = 20
+@export var anchor_path: NodePath
+@export var parallax_enabled: bool = true
+@export var parallax_max_px: float = 10.0
+@export var parallax_lerp_speed: float = 7.0
+@onready var anchor: Node2D = get_node_or_null(anchor_path) as Node2D
 
+var _anchor_base_pos: Vector2 = Vector2.ZERO
+var _anchor_base_set: bool = false
 var deck: Array[int] = []
 var discard: Array[int] = []
 var _is_dealing: bool = false
@@ -45,6 +52,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		discard_one()
 		get_viewport().set_input_as_handled()
 		return
+
+func _process(delta: float) -> void:
+	if not parallax_enabled:
+		return
+	if anchor == null:
+		return
+	if not _anchor_base_set:
+		_anchor_base_pos = anchor.position
+		_anchor_base_set = true
+		print("[PARALLAX] base=", _anchor_base_pos)
+	var vp := get_viewport()
+	var rect := vp.get_visible_rect()
+	var center: Vector2 = rect.size * 0.5
+	if center.x <= 0.0 or center.y <= 0.0:
+		return
+	var mouse: Vector2 = vp.get_mouse_position()
+	var norm: Vector2 = (mouse - center) / center
+	norm.x = clampf(norm.x, -1.0, 1.0)
+	norm.y = clampf(norm.y, -1.0, 1.0)
+	var strength: float = parallax_max_px * 0.6
+	var target: Vector2 = _anchor_base_pos + (norm * strength)
+	anchor.position = anchor.position.lerp(target, parallax_lerp_speed * delta)
 
 func deal_one() -> void:
 	if _is_dealing:

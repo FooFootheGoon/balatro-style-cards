@@ -30,6 +30,7 @@ offset_right = 94.0
 offset_bottom = 148.0
 pivot_offset = Vector2(120, 168)
 script = ExtResource("1_6u4wf")
+vel_debug = true
 
 [node name="Visual" type="Control" parent="."]
 layout_mode = 1

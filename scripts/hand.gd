@@ -8,6 +8,14 @@ extends Control
 @export var y_min_px: float = -260.0
 @export var y_max_px: float = 50.0
 @export var card_size_px: Vector2 = Vector2(210, 294)
+@export var wave_enabled: bool = true
+@export var wave_amp_px: float = 4.0
+@export var wave_freq_hz: float = 0.6
+@export var wave_phase_step: float = 0.5
+@export var wave_pause_after_layout_s: float = 0.35
+
+var _wave_t: float = 0.0
+var _wave_paused_until_ms: int = 0
 
 func draw_card() -> void:
 	if card_scene == null:
@@ -100,18 +108,11 @@ func layout_cards_animated(duration: float = 0.22, skip: Control = null) -> Twee
 	return tw
 
 func update_cards() -> void:
+	pause_wave(wave_pause_after_layout_s)
 	var cards: Array[Node] = get_children()
 	var count: int = cards.size()
 	if count == 0:
 		return
-	var hand_w: float = size.x
-	var card_w: float = card_size_px.x
-	var final_sep: float = x_sep_px
-	var combined_w: float = (card_w * count) + (final_sep * (count - 1))
-	if count > 1 and combined_w > hand_w:
-		final_sep = (hand_w - (card_w * count)) / float(count - 1)
-		combined_w = hand_w
-	#var offset_x: float = (hand_w - combined_w) * 0.5 # I've accidentally deleted the use case for this. 
 	var dragged := MouseBrain.node_being_dragged
 	for i in range(count):
 		var c := cards[i] as Control
@@ -119,7 +120,61 @@ func update_cards() -> void:
 			continue
 		if c == dragged:
 			continue
+		if c.has_method("set_dealing") and bool(c.get("is_dealing")):
+			continue
 		var layout := get_layout_for_index(i, count)
 		c.position = layout["pos"]
 		c.rotation_degrees = layout["rot_deg"]
 	print("[HAND] updated count=", count, " sep=", get_layout_for_index(0, count)["sep"])
+
+func pause_wave(seconds: float) -> void:
+	var until_ms: int = Time.get_ticks_msec() + int(maxf(0.0, seconds) * 1000.0)
+	_wave_paused_until_ms = maxi(_wave_paused_until_ms, until_ms)
+
+func _process(delta: float) -> void:
+	if not wave_enabled:
+		return
+	if Time.get_ticks_msec() < _wave_paused_until_ms:
+		return
+	var cards: Array[Node] = get_children()
+	var count: int = cards.size()
+	if count <= 0:
+		return
+	var dragged := MouseBrain.node_being_dragged
+	var pause_now: bool = false
+	for i in range(count):
+		var c := cards[i] as Control
+		if c == null:
+			continue
+		if c == dragged:
+			pause_now = true
+			break
+		if bool(c.get("mouse_in")):
+			pause_now = true
+			break
+		if c.has_method("set_dealing") and bool(c.get("is_dealing")):
+			pause_now = true
+			break
+	if pause_now:
+		for i in range(count):
+			var c := cards[i] as Control
+			if c == null:
+				continue
+			if c == dragged:
+				continue
+			if c.has_method("set_dealing") and bool(c.get("is_dealing")):
+				continue
+			var layout: Dictionary = get_layout_for_index(i, count)
+			c.position = layout["pos"]
+			c.rotation_degrees = layout["rot_deg"]
+		return
+	_wave_t += delta
+	for i in range(count):
+		var c := cards[i] as Control
+		if c == null:
+			continue
+		var layout: Dictionary = get_layout_for_index(i, count)
+		var base: Vector2 = layout["pos"]
+		var phase: float = (_wave_t * TAU * wave_freq_hz) + (float(i) * wave_phase_step)
+		c.position = Vector2(base.x, base.y + (sin(phase) * wave_amp_px))
+		c.rotation_degrees = layout["rot_deg"]

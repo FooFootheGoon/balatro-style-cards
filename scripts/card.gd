@@ -28,6 +28,14 @@ var drag_grab_offset: Vector2 = Vector2.ZERO
 var shadow_mat: ShaderMaterial = null
 var shadow_tilt_mult: float = 0.85
 var is_dealing: bool = false
+var drag_rot_target: float = 0.0
+var vel_last_global_pos: Vector2 = Vector2(INF, INF)
+var vel_rot_current: float = 0.0
+var vel_tilt_max_deg: float = 9.0
+var vel_tilt_deg_per_speed: float = 0.008
+var vel_tilt_lerp_speed: float = 18.0
+
+@export var vel_debug: bool = false
 
 func _ready() -> void:
 	custom_minimum_size = card_size
@@ -110,7 +118,25 @@ func _update_tilt(delta: float) -> void:
 		shadow_mat.set_shader_parameter("x_rot", tilt_current.x * shadow_tilt_mult)
 		shadow_mat.set_shader_parameter("y_rot", tilt_current.y * shadow_tilt_mult)
 
+func _update_velocity_tilt(delta: float) -> void:
+	if is_inf(vel_last_global_pos.x):
+		vel_last_global_pos = global_position
+		vel_rot_current = 0.0
+		return
+	var safe_dt: float = maxf(delta, 0.00001)
+	var vel: Vector2 = (global_position - vel_last_global_pos) / safe_dt
+	vel_last_global_pos = global_position
+	var target: float = clampf(vel.x * vel_tilt_deg_per_speed, -vel_tilt_max_deg, vel_tilt_max_deg)
+	target += clampf(-vel.y * (vel_tilt_deg_per_speed * 0.35), -(vel_tilt_max_deg * 0.35), vel_tilt_max_deg * 0.35)
+	vel_rot_current = lerpf(vel_rot_current, target, vel_tilt_lerp_speed * delta)
+	if vel_debug and absf(target) > 0.9:
+		print("[VEL_TILT] v=", vel, " target=", target, " cur=", vel_rot_current)
 
+func _apply_visual_rotation(delta: float) -> void:
+	if visual == null:
+		return
+	var target: float = drag_rot_target + vel_rot_current
+	visual.rotation_degrees = lerpf(visual.rotation_degrees, target, 14.0 * delta)
 
 func _on_mouse_entered() -> void:
 	mouse_in = true
@@ -122,6 +148,8 @@ func _on_mouse_exited() -> void:
 
 func _physics_process(delta: float) -> void:
 	drag_logic(delta)
+	_update_velocity_tilt(delta)
+	_apply_visual_rotation(delta)
 	_update_tilt(delta)
 	_update_shadow()
 	polish_logic()
@@ -137,6 +165,7 @@ func drag_logic(delta: float) -> void:
 		if not is_dragging:
 			print("[CARD_DRAG] start")
 			drag_grab_offset = global_position - get_global_mouse_position()
+			last_global_pos = global_position
 		is_dragging = true
 		MouseBrain.node_being_dragged = self
 		var p := get_parent()
@@ -153,7 +182,7 @@ func drag_logic(delta: float) -> void:
 		if MouseBrain.node_being_dragged == self:
 			MouseBrain.node_being_dragged = null
 		z_index = 0
-		visual.rotation_degrees = lerpf(visual.rotation_degrees, 0.0, 12.0 * delta)
+		drag_rot_target = 0.0
 		last_global_pos = global_position
 
 func polish_logic() -> void:
@@ -173,8 +202,6 @@ func polish_logic() -> void:
 		change_scale(hover_scale_mult)
 		return
 	change_scale(idle_scale_mult)
-	# Idle state: ensure visuals settle back cleanly
-	visual.rotation_degrees = lerpf(visual.rotation_degrees, 0.0, 12.0 * get_physics_process_delta_time())
 
 func change_scale(desired_mult: float) -> void:
 	if is_equal_approx(desired_mult, current_goal_scale):
@@ -188,10 +215,9 @@ func change_scale(desired_mult: float) -> void:
 	var target_scale: Vector2 = base_face_scale * desired_mult
 	scale_tween.tween_property(face, "scale", target_scale, 0.14)
 
-func _set_rotation(delta: float) -> void:
+func _set_rotation(_delta: float) -> void:
 	var x_delta: float = global_position.x - last_global_pos.x
-	var desired: float = clampf(x_delta * 0.85, -max_card_rotation, max_card_rotation)
-	visual.rotation_degrees = lerpf(visual.rotation_degrees, desired, 12.0 * delta)
+	drag_rot_target = clampf(x_delta * 0.85, -max_card_rotation, max_card_rotation)
 	last_global_pos = global_position
 
 func set_dealing(value: bool) -> void:
