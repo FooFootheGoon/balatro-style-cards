@@ -4,6 +4,10 @@ extends Control
 @onready var visual: Control = $Visual
 @onready var face: Sprite2D = $Visual/Face
 @onready var shadow: Sprite2D = $Visual/Face/Shadow
+@onready var corner_label: Label = get_node_or_null("Visual/CornerLabel") as Label
+
+const _RANK_STR := ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]
+const _SUIT_STR := ["C","D","H","S"] # or ["♣","♦","♥","♠"]
 
 var shadow_offset: Vector2 = Vector2(-12, 12)
 var mouse_in: bool = false
@@ -34,6 +38,7 @@ var vel_rot_current: float = 0.0
 var vel_tilt_max_deg: float = 9.0
 var vel_tilt_deg_per_speed: float = 0.008
 var vel_tilt_lerp_speed: float = 18.0
+var card_id: int = -1
 
 @export var vel_debug: bool = false
 
@@ -69,6 +74,8 @@ func _ready() -> void:
 	tilt_last_pos = global_position
 	print("[CARD] shadow offset=", shadow.position)
 	print("[CARD] ready size=", size, " pivot=", pivot_offset)
+	if card_id < 0 and has_meta("card_id"):
+		set_card_id(int(get_meta("card_id")))
 
 func _fit_face() -> void:
 	if face.texture == null:
@@ -232,3 +239,20 @@ func _set_rotation(_delta: float) -> void:
 
 func set_dealing(value: bool) -> void:
 	is_dealing = value
+
+func set_card_id(id: int) -> void:
+	card_id = id
+	var txt := _card_id_to_text(card_id)
+	if corner_label != null:
+		corner_label.text = txt
+	print("[CARD_ID] set id=", card_id, " txt=", txt)
+
+func get_card_id() -> int:
+	return card_id
+
+func _card_id_to_text(id: int) -> String:
+	var rank: int = id % 13
+	var suit: int = int(id / 13)
+	if suit < 0 or suit >= 4 or rank < 0 or rank >= 13:
+		return "??"
+	return _RANK_STR[rank] + _SUIT_STR[suit]

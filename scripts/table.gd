@@ -9,6 +9,8 @@ extends Node2D
 @export var parallax_max_px: float = 10.0
 @export var parallax_lerp_speed: float = 7.0
 @onready var anchor: Node2D = get_node_or_null(anchor_path) as Node2D
+@onready var hand: Control = get_node(hand_path) as Control
+@onready var deck_visual: Control = get_node(deck_visual_path) as Control
 
 var _anchor_base_pos: Vector2 = Vector2.ZERO
 var _anchor_base_set: bool = false
@@ -16,8 +18,8 @@ var deck: Array[int] = []
 var discard: Array[int] = []
 var _is_dealing: bool = false
 
-@onready var hand: Control = get_node(hand_path) as Control
-@onready var deck_visual: Control = get_node(deck_visual_path) as Control
+const _RANK_STR := ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]
+const _SUIT_STR := ["♣","♦","♥","♠"]
 
 func _ready() -> void:
 	_build_deck()
@@ -27,10 +29,18 @@ func _ready() -> void:
 func _build_deck() -> void:
 	deck.clear()
 	discard.clear()
-	for i in range(starting_deck_size):
-		deck.append(0)
-	deck.shuffle()
-	print("[DECK] built+shuffled count=", deck.size())
+	# Standard 52-card deck: id = suit * 13 + rank
+	# suit: 0..3, rank: 0..12
+	var full: Array[int] = []
+	for suit in range(4):
+		for rank in range(13):
+			full.append((suit * 13) + rank)
+	full.shuffle()
+	# Keep your existing "starting_deck_size" as a test knob.
+	var n: int = clampi(starting_deck_size, 0, full.size())
+	for i in range(n):
+		deck.append(full[i])
+	print("[DECK] built+shuffled count=", deck.size(), " top5=", _debug_top_cards(5))
 
 func _disable_deck_visual_interaction() -> void:
 	if deck_visual == null:
@@ -103,6 +113,8 @@ func deal_one() -> void:
 	c.scale = Vector2.ONE * 0.90
 	c.z_index = 1000
 	c.set_meta("card_id", id)
+	if c.has_method("set_card_id"):
+		c.call("set_card_id", id)
 	var count: int = hand.get_child_count()
 	var index: int = count - 1
 	var layout: Dictionary = hand.call("get_layout_for_index", index, count)
@@ -222,6 +234,8 @@ func deal_cards(amount: int) -> void:
 		c.scale = Vector2.ONE * 0.90
 		c.z_index = 1000 + i
 		c.set_meta("card_id", id)
+		if c.has_method("set_card_id"):
+			c.call("set_card_id", id)
 		new_cards.append(c)
 		var idx: int = start_count + i
 		var lay: Dictionary = hand.call("get_layout_for_index", idx, final_count)
@@ -314,3 +328,17 @@ func _settle_hand_after_deal() -> void:
 	if hand != null and not _is_dealing:
 		hand.call("update_cards")
 		print("[DECK_FIX] settle_hand")
+
+func _card_id_to_text(id: int) -> String:
+	var rank: int = id % 13
+	var suit: int = int(id / 13)
+	if suit < 0 or suit >= 4 or rank < 0 or rank >= 13:
+		return "??"
+	return _RANK_STR[rank] + _SUIT_STR[suit]
+
+func _debug_top_cards(amount: int) -> String:
+	var n: int = mini(amount, deck.size())
+	var out: Array[String] = []
+	for i in range(n):
+		out.append(_card_id_to_text(deck[deck.size() - 1 - i]))
+	return ",".join(out)
