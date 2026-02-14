@@ -1,13 +1,15 @@
 extends Control
 
 @export var card_size := Vector2(210, 294)
+@export var vel_debug: bool = false
+
 @onready var visual: Control = $Visual
 @onready var face: Sprite2D = $Visual/Face
 @onready var shadow: Sprite2D = $Visual/Face/Shadow
 @onready var corner_label: Label = get_node_or_null("Visual/CornerLabel") as Label
 
 const _RANK_STR := ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]
-const _SUIT_STR := ["C","D","H","S"] # or ["♣","♦","♥","♠"]
+const _SUIT_STR := ["♣","♦","♥","♠"]
 
 var shadow_offset: Vector2 = Vector2(-12, 12)
 var mouse_in: bool = false
@@ -40,16 +42,14 @@ var vel_tilt_deg_per_speed: float = 0.008
 var vel_tilt_lerp_speed: float = 18.0
 var card_id: int = -1
 
-@export var vel_debug: bool = false
-
 func _ready() -> void:
 	custom_minimum_size = card_size
 	size = card_size
-	pivot_offset = Vector2(size.x * 0.5, size.y)
-	visual.pivot_offset = pivot_offset
+	pivot_offset = Vector2(size.x * 0.5, size.y) # Set pivot around bottom centre
+	visual.pivot_offset = pivot_offset # Set shadow pivot as same as parent
 	_fit_face()
 	if face.material != null:
-		face.material = face.material.duplicate()
+		face.material = face.material.duplicate() # So that it doesn't affect all cards
 		face_mat = face.material as ShaderMaterial
 		print("[CARD_3D] mat_ok=", face_mat != null)
 		print("[CARD_3D] has_face_material=", face.material != null)
@@ -68,7 +68,7 @@ func _ready() -> void:
 		if shadow_mat != null:
 			shadow_mat.set_shader_parameter("cull_back", false)
 		print("[CARD_SHADOW] mat_ok=", shadow_mat != null)
-	last_global_pos = global_position
+	last_global_pos = global_position # Update its position marker for other effects
 	base_face_scale = face.scale
 	shadow.position = shadow_offset
 	tilt_last_pos = global_position
@@ -101,13 +101,13 @@ func _update_tilt(delta: float) -> void:
 		target = Vector2.ZERO
 	elif is_dragging:
 		var dpos: Vector2 = global_position - tilt_last_pos
-		var pitch_deg: float = clampf(-dpos.y * drag_tilt_deg_per_px, -drag_tilt_max_deg, drag_tilt_max_deg)
+		var pitch_deg: float = clampf(-dpos.y * drag_tilt_deg_per_px, -drag_tilt_max_deg, drag_tilt_max_deg) # clampf is float clamp; never exceed ±drag_tilt_max_deg
 		var yaw_deg: float = clampf(dpos.x * drag_tilt_deg_per_px, -drag_tilt_max_deg, drag_tilt_max_deg)
 		target = Vector2(pitch_deg, yaw_deg)
 	elif mouse_in:
 		var mouse_vp: Vector2 = get_viewport().get_mouse_position()
 		var centre: Vector2 = global_position + size * 0.5
-		var rel: Vector2 = mouse_vp - centre
+		var rel: Vector2 = mouse_vp - centre # Relative. The cool kids use abbreviations.
 		var half: Vector2 = size * 0.5
 		var norm := Vector2(
 			clampf(rel.x / half.x, -1.0, 1.0),
@@ -118,7 +118,7 @@ func _update_tilt(delta: float) -> void:
 			norm.x * hover_tilt_max_deg
 		)
 	tilt_last_pos = global_position
-	tilt_current = tilt_current.lerp(target, tilt_lerp_speed * delta)
+	tilt_current = tilt_current.lerp(target, tilt_lerp_speed * delta) # lerp is linear interpolation; move smoothly from current toward target
 	face_mat.set_shader_parameter("x_rot", tilt_current.x)
 	face_mat.set_shader_parameter("y_rot", tilt_current.y)
 	if shadow_mat != null:
@@ -252,6 +252,7 @@ func get_card_id() -> int:
 
 func _card_id_to_text(id: int) -> String:
 	var rank: int = id % 13
+	@warning_ignore("integer_division")
 	var suit: int = int(id / 13)
 	if suit < 0 or suit >= 4 or rank < 0 or rank >= 13:
 		return "??"

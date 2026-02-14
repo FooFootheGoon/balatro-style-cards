@@ -29,14 +29,11 @@ func _ready() -> void:
 func _build_deck() -> void:
 	deck.clear()
 	discard.clear()
-	# Standard 52-card deck: id = suit * 13 + rank
-	# suit: 0..3, rank: 0..12
 	var full: Array[int] = []
 	for suit in range(4):
 		for rank in range(13):
 			full.append((suit * 13) + rank)
 	full.shuffle()
-	# Keep your existing "starting_deck_size" as a test knob.
 	var n: int = clampi(starting_deck_size, 0, full.size())
 	for i in range(n):
 		deck.append(full[i])

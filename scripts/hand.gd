@@ -13,11 +13,15 @@ extends Control
 @export var wave_freq_hz: float = 0.6
 @export var wave_phase_step: float = 0.5
 @export var wave_pause_after_layout_s: float = 0.35
+@export var wave_fade_in_s: float = 0.35
+@export var wave_fade_out_s: float = 0.18
 
 var _wave_t: float = 0.0
 var _wave_paused_until_ms: int = 0
 var _drag_last_index: int = -1
 var _drag_preview_tw: Tween	
+var _wave_amp_current: float = 0.0
+
 
 func draw_card() -> void:
 	if card_scene == null:
@@ -111,6 +115,7 @@ func layout_cards_animated(duration: float = 0.22, skip: Control = null) -> Twee
 	return tw
 
 func update_cards() -> void:
+	_wave_amp_current = 0.0
 	pause_wave(wave_pause_after_layout_s)
 	var cards: Array[Node] = get_children()
 	var count: int = cards.size()
@@ -142,6 +147,14 @@ func _process(delta: float) -> void:
 	if count <= 0:
 		return
 	var dragged := MouseBrain.node_being_dragged as Control
+	var now_ms: int = Time.get_ticks_msec()
+	var paused_by_timer: bool = now_ms < _wave_paused_until_ms
+	var amp_in_step: float = 0.0
+	var amp_out_step: float = 0.0
+	if wave_fade_in_s > 0.001:
+		amp_in_step = (wave_amp_px / wave_fade_in_s) * delta
+	if wave_fade_out_s > 0.001:
+		amp_out_step = (wave_amp_px / wave_fade_out_s) * delta
 	if dragged != null and dragged.get_parent() == self:
 		var x_center: float = dragged.position.x + (dragged.size.x * 0.5)
 		var target_index: int = 0
@@ -159,6 +172,7 @@ func _process(delta: float) -> void:
 				_drag_preview_tw.kill()
 			pause_wave(0.20)
 			_drag_preview_tw = layout_cards_animated(0.12, dragged)
+		_wave_amp_current = move_toward(_wave_amp_current, wave_amp_px, amp_in_step)
 		_wave_t += delta
 		for i in range(count):
 			var c := cards[i] as Control
@@ -173,13 +187,11 @@ func _process(delta: float) -> void:
 				prev_off = float(c.get_meta("_wave_off_y"))
 			var base_y: float = c.position.y - prev_off
 			var phase: float = (_wave_t * TAU * wave_freq_hz) + (float(i) * wave_phase_step)
-			var new_off: float = sin(phase) * wave_amp_px
+			var new_off: float = sin(phase) * _wave_amp_current
 			c.position = Vector2(c.position.x, base_y + new_off)
 			c.set_meta("_wave_off_y", new_off)
 		return
 	_drag_last_index = -1
-	if Time.get_ticks_msec() < _wave_paused_until_ms:
-		return
 	var pause_now: bool = false
 	for i in range(count):
 		var c := cards[i] as Control
@@ -191,7 +203,8 @@ func _process(delta: float) -> void:
 		if c.has_method("set_dealing") and bool(c.get("is_dealing")):
 			pause_now = true
 			break
-	if pause_now:
+	if pause_now or paused_by_timer:
+		_wave_amp_current = move_toward(_wave_amp_current, 0.0, amp_out_step)
 		for i in range(count):
 			var c := cards[i] as Control
 			if c == null:
@@ -203,6 +216,7 @@ func _process(delta: float) -> void:
 			c.rotation_degrees = layout["rot_deg"]
 			c.set_meta("_wave_off_y", 0.0)
 		return
+	_wave_amp_current = move_toward(_wave_amp_current, wave_amp_px, amp_in_step)
 	_wave_t += delta
 	for i in range(count):
 		var c := cards[i] as Control
@@ -211,6 +225,6 @@ func _process(delta: float) -> void:
 		var layout: Dictionary = get_layout_for_index(i, count)
 		var base: Vector2 = layout["pos"]
 		var phase: float = (_wave_t * TAU * wave_freq_hz) + (float(i) * wave_phase_step)
-		c.position = Vector2(base.x, base.y + (sin(phase) * wave_amp_px))
+		c.position = Vector2(base.x, base.y + (sin(phase) * _wave_amp_current))
 		c.rotation_degrees = layout["rot_deg"]
 		c.set_meta("_wave_off_y", 0.0)
