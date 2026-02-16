@@ -1,6 +1,7 @@
 extends Control
 
 @export var card_back_scene: PackedScene
+@export var card_size: Vector2 = Vector2(240, 336)
 @export var stack_offset_px: Vector2 = Vector2(-0.35, -0.35)
 @export var max_visual_count: int = 9999
 
@@ -16,6 +17,8 @@ func set_count(new_count: int) -> void:
 			print("[STACK] instantiate failed")
 			return
 		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		c.custom_minimum_size = card_size
+		c.size = card_size
 		add_child(c)
 		have += 1
 	while have > want:
@@ -26,6 +29,8 @@ func set_count(new_count: int) -> void:
 	for i in range(have):
 		var cc := get_child(i) as Control
 		if cc != null:
+			cc.custom_minimum_size = card_size
+			cc.size = card_size
 			cc.position = Vector2(float(i) * stack_offset_px.x, float(i) * stack_offset_px.y)
 			cc.z_index = i
 
