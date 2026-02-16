@@ -41,6 +41,7 @@ var vel_tilt_max_deg: float = 9.0
 var vel_tilt_deg_per_speed: float = 0.008
 var vel_tilt_lerp_speed: float = 18.0
 var card_id: int = -1
+var deck_def: DeckDefinition = null
 
 func _ready() -> void:
 	custom_minimum_size = card_size
@@ -76,6 +77,11 @@ func _ready() -> void:
 	print("[CARD] ready size=", size, " pivot=", pivot_offset)
 	if card_id < 0 and has_meta("card_id"):
 		set_card_id(int(get_meta("card_id")))
+
+func set_deck_def(value: DeckDefinition) -> void:
+	deck_def = value
+	if card_id >= 0:
+		set_card_id(card_id)
 
 func _fit_face() -> void:
 	if face.texture == null:
@@ -251,6 +257,8 @@ func get_card_id() -> int:
 	return card_id
 
 func _card_id_to_text(id: int) -> String:
+	if deck_def != null:
+		return deck_def.card_id_to_text(id)
 	var rank: int = id % 13
 	@warning_ignore("integer_division")
 	var suit: int = int(id / 13)
