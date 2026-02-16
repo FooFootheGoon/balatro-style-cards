@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://3iwl1sp8guso"]
+
+[ext_resource type="Script" uid="uid://2hv6g10xkjui" path="res://scripts/card_back_view.gd" id="1_oifxa"]
+
+[node name="CardBackView" type="Control"]
+custom_minimum_size = Vector2(94, 148)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 94.0
+offset_bottom = 148.0
+script = ExtResource("1_oifxa")

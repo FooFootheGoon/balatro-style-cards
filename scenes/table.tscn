@@ -1,16 +1,21 @@
-[gd_scene load_steps=4 format=3 uid="uid://co5w8lk5o2fbt"]
+[gd_scene load_steps=6 format=3 uid="uid://co5w8lk5o2fbt"]
 
 [ext_resource type="Script" uid="uid://kk45cnq0ovpu" path="res://scripts/table.gd" id="1_x8522"]
 [ext_resource type="PackedScene" uid="uid://d1urynih8ert2" path="res://scenes/card.tscn" id="2_olh0b"]
 [ext_resource type="PackedScene" uid="uid://dxy2wn4epwwfm" path="res://scenes/hand.tscn" id="3_u03e6"]
+[ext_resource type="Script" uid="uid://ccptcnrpqt7j5" path="res://scripts/deck_stack_view.gd" id="4_u03e6"]
+[ext_resource type="PackedScene" uid="uid://3iwl1sp8guso" path="res://scenes/card_back_view.tscn" id="5_2f5gb"]
 
 [node name="Table" type="Node2D"]
 script = ExtResource("1_x8522")
 hand_path = NodePath("Anchor/Hand")
-deck_visual_path = NodePath("Anchor/Card")
+deck_visual_path = NodePath("Anchor/DeckStack")
 card_scene = ExtResource("2_olh0b")
 starting_deck_size = 52
 anchor_path = NodePath("Anchor")
+discard_visual_path = NodePath("Anchor/DiscardStack")
+exile_visual_path = NodePath("Anchor/ExileStack")
+play_zone_path = NodePath("Anchor/PlayZone")
 
 [node name="Anchor" type="Node2D" parent="."]
 
@@ -21,9 +26,41 @@ offset_right = 1119.0
 offset_bottom = 903.0
 y_min_px = 90.0
 
-[node name="Card" parent="Anchor" instance=ExtResource("2_olh0b")]
-offset_left = 12.0
-offset_top = 4.0
-offset_right = 252.0
-offset_bottom = 340.0
-card_size = null
+[node name="DeckStack" type="Control" parent="Anchor"]
+custom_minimum_size = Vector2(240, 336)
+layout_mode = 3
+anchors_preset = 0
+offset_left = -2.0
+offset_top = 400.0
+offset_right = 263.0
+offset_bottom = 736.0
+script = ExtResource("4_u03e6")
+card_back_scene = ExtResource("5_2f5gb")
+
+[node name="PlayZone" type="Control" parent="Anchor"]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 1089.0
+offset_top = 2.0
+offset_right = 1280.0
+offset_bottom = 295.0
+
+[node name="DiscardStack" type="Control" parent="Anchor"]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 811.0
+offset_top = 2.0
+offset_right = 997.0
+offset_bottom = 275.0
+script = ExtResource("4_u03e6")
+card_back_scene = ExtResource("5_2f5gb")
+
+[node name="ExileStack" type="Control" parent="Anchor"]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 641.0
+offset_top = 7.0
+offset_right = 846.0
+offset_bottom = 302.0
+script = ExtResource("4_u03e6")
+card_back_scene = ExtResource("5_2f5gb")

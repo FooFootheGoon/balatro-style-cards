@@ -8,9 +8,6 @@ extends Node2D
 @export var parallax_enabled: bool = true
 @export var parallax_max_px: float = 10.0
 @export var parallax_lerp_speed: float = 7.0
-@onready var anchor: Node2D = get_node_or_null(anchor_path) as Node2D
-@onready var hand: Control = get_node(hand_path) as Control
-@onready var deck_visual: Control = get_node(deck_visual_path) as Control
 @export var deck_def: DeckDefinition
 @export var player_count: int = 2
 @export var active_player_idx: int = 0
@@ -18,7 +15,20 @@ extends Node2D
 @export var reshuffle_uses_seed: bool = false
 @export var rng_seed: int = 12345
 @export var max_hand_size: int = 5
+@export var discard_visual_path: NodePath
+@export var exile_visual_path: NodePath
+@export var play_zone_path: NodePath
 
+var anchor: Node2D
+var hand: Control
+var deck_visual: Control
+var discard_visual: Control
+var exile_visual: Control
+var play_zone: Control
+var players: Array[PlayerState] = []
+var _anchor_base_pos: Vector2 = Vector2.ZERO
+var _anchor_base_set: bool = false
+var _is_dealing: bool = false
 var deck: Array[int]:
 	get:
 		_ensure_players()
@@ -34,20 +44,42 @@ var discard: Array[int]:
 		_ensure_players()
 		players[active_player_idx].discard = value
 
-var players: Array[PlayerState] = []
-var _anchor_base_pos: Vector2 = Vector2.ZERO
-var _anchor_base_set: bool = false
-var _is_dealing: bool = false
-
 const _RANK_STR := ["A","2","3","4","5","6","7","8","9","10","J","Q","K"]
 const _SUIT_STR := ["♣","♦","♥","♠"]
 
 func _ready() -> void:
+	anchor = get_node_or_null(anchor_path) as Node2D
+	hand = get_node_or_null(hand_path) as Control
+	deck_visual = get_node_or_null(deck_visual_path) as Control
+	discard_visual = get_node_or_null(discard_visual_path) as Control
+	exile_visual = get_node_or_null(exile_visual_path) as Control
+	play_zone = get_node_or_null(play_zone_path) as Control
+	if hand == null:
+		hand = get_node_or_null("Anchor/Hand") as Control
+	if deck_visual == null:
+		deck_visual = get_node_or_null("Anchor/DeckStack") as Control
+	if discard_visual == null:
+		discard_visual = get_node_or_null("Anchor/DiscardStack") as Control
+	if exile_visual == null:
+		exile_visual = get_node_or_null("Anchor/ExileStack") as Control
+	if play_zone == null:
+		play_zone = get_node_or_null("Anchor/PlayZone") as Control
+	if hand == null:
+		print("[PATH] missing hand (set hand_path)")
+	if deck_visual == null:
+		print("[PATH] missing deck_visual (set deck_visual_path)")
+	if discard_visual == null:
+		print("[PATH] missing discard_visual (set discard_visual_path)")
+	if exile_visual == null:
+		print("[PATH] missing exile_visual (set exile_visual_path)")
+	if play_zone == null:
+		print("[PATH] missing play_zone (set play_zone_path)")
 	if deck_def == null:
 		deck_def = DeckDefinition.make_standard_52()
 		print("[DECK_DEF] defaulted to standard_52")
 	_build_deck()
 	_disable_deck_visual_interaction()
+	_refresh_pile_visuals()
 	print("[DECK] ready players=", players.size(), " active=", active_player_idx, " deck_count=", deck.size())
 
 func _build_deck() -> void:
@@ -125,6 +157,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		switch_active_player(next_idx)
 		get_viewport().set_input_as_handled()
 		return
+	if event.is_action_pressed("PlayCard"):
+		play_last_hand_card()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("ResolveToDiscard"):
+		resolve_play_to_discard(active_player_idx)
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("ResolveToExile"):
+		resolve_play_to_exile(active_player_idx)
+		get_viewport().set_input_as_handled()
+		return
 
 func _process(delta: float) -> void:
 	if not parallax_enabled:
@@ -152,21 +196,21 @@ func deal_one() -> void:
 	if _is_dealing:
 		print("[DRAW_SLEEK] blocked: dealing")
 		return
-	var p: PlayerState = _active()
-	if p.draw.is_empty():
-		print("[DRAW_SLEEK] blocked: deck empty p=", p.owner_id)
-		return
 	if hand == null or deck_visual == null or card_scene == null:
 		print("[DRAW_SLEEK] blocked: missing refs")
 		return
+	var p: PlayerState = _active()
+	var id: int = _pop_draw_card_id(active_player_idx)
+	if id < 0:
+		print("[DRAW_SLEEK] blocked: deck empty p=", p.owner_id, " discard=", p.discard.size())
+		return
 	_is_dealing = true
-	var id: int = int(p.draw.pop_back())
 	p.hand.append(id)
 	var c := card_scene.instantiate() as Control
 	if c == null:
 		print("[DRAW_SLEEK] instantiate failed")
 		p.hand.pop_back()
-		p.draw.append(id)
+		players[active_player_idx].draw.append(id)
 		_is_dealing = false
 		return
 	if c.has_method("set_dealing"):
@@ -229,7 +273,7 @@ func deal_one() -> void:
 	var s3 := tw.parallel().tween_property(c, "scale", Vector2.ONE, d3)
 	s3.set_trans(Tween.TRANS_BACK)
 	s3.set_ease(Tween.EASE_OUT)
-	print("[DRAW_SLEEK] p=", p.owner_id, " id=", id, " draw_left=", p.draw.size(), " hand_model=", p.hand.size(), " hand_nodes=", count, " dur=", dur)
+	print("[DRAW_SLEEK] p=", p.owner_id, " id=", id, " draw_left=", p.draw.size(), " discard=", p.discard.size(), " hand_model=", p.hand.size(), " hand_nodes=", count, " dur=", dur)
 	var timeout_ms: int = int((dur + 0.25) * 1000.0)
 	var t0: int = Time.get_ticks_msec()
 	while is_instance_valid(tw) and tw.is_running() and (Time.get_ticks_msec() - t0) < timeout_ms:
@@ -246,56 +290,34 @@ func deal_one() -> void:
 			c.set_dealing(false)
 	_is_dealing = false
 
-func deal_cards(amount: int) -> void:
+func deal_cards(count: int) -> void:
 	if _is_dealing:
-		print("[DRAW_BATCH] blocked: dealing")
-		return
-	if deck.is_empty():
-		print("[DRAW_BATCH] blocked: deck empty")
+		print("[DEAL_BURST] blocked: dealing")
 		return
 	if hand == null or deck_visual == null or card_scene == null:
-		print("[DRAW_BATCH] blocked: missing refs")
+		print("[DEAL_BURST] blocked: missing refs")
 		return
-	var n: int = mini(amount, deck.size())
-	if n <= 0:
-		print("[DRAW_BATCH] blocked: n<=0")
+	var want: int = maxi(0, count)
+	if want <= 0:
 		return
+	var p: PlayerState = _active()
 	_is_dealing = true
-	var existing: Array[Control] = []
-	for ch in hand.get_children():
-		var cc := ch as Control
-		if cc != null:
-			existing.append(cc)
-	var start_count: int = existing.size()
-	var final_count: int = start_count + n
 	var deck_global: Vector2 = deck_visual.get_global_transform_with_canvas().origin
 	var hand_inv: Transform2D = hand.get_global_transform_with_canvas().affine_inverse()
 	var start_pos: Vector2 = hand_inv * deck_global
-	var shift_dur: float = 0.18
-	for i in range(start_count):
-		var ec: Control = existing[i]
-		var lay_e: Dictionary = hand.call("get_layout_for_index", i, final_count)
-		var end_e_pos: Vector2 = lay_e.get("pos", ec.position)
-		var end_e_rot: float = float(lay_e.get("rot_deg", ec.rotation_degrees))
-		var etw := ec.create_tween()
-		var ep := etw.tween_property(ec, "position", end_e_pos, shift_dur)
-		ep.set_trans(Tween.TRANS_QUAD)
-		ep.set_ease(Tween.EASE_OUT)
-		var er := etw.parallel().tween_property(ec, "rotation_degrees", end_e_rot, shift_dur)
-		er.set_trans(Tween.TRANS_QUAD)
-		er.set_ease(Tween.EASE_OUT)
-	var new_cards: Array[Control] = []
-	var base_delay: float = 0.045
-	var base_dur: float = 0.22
-	var dur_step: float = 0.04
-	var max_end_s: float = 0.0
-	for i in range(n):
-		var p: PlayerState = _active()
-		var id: int = int(deck.pop_back())
+	var created: Array[Control] = []
+	var dealt: int = 0
+	for i in range(want):
+		var id: int = _pop_draw_card_id(active_player_idx)
+		if id < 0:
+			print("[DEAL_BURST] stop: no more cards p=", p.owner_id, " dealt=", dealt, " discard=", p.discard.size())
+			break
 		p.hand.append(id)
 		var c := card_scene.instantiate() as Control
 		if c == null:
-			print("[DRAW_BATCH] instantiate failed at i=", i)
+			print("[DEAL_BURST] instantiate failed at i=", i)
+			p.hand.pop_back()
+			players[active_player_idx].draw.append(id)
 			continue
 		if c.has_method("set_dealing"):
 			c.set_dealing(true)
@@ -309,34 +331,39 @@ func deal_cards(amount: int) -> void:
 		c.set_meta("card_id", id)
 		if c.has_method("set_card_id"):
 			c.call("set_card_id", id)
-		new_cards.append(c)
-		var idx: int = start_count + i
-		var lay: Dictionary = hand.call("get_layout_for_index", idx, final_count)
-		var end_pos: Vector2 = lay.get("pos", Vector2.ZERO)
-		var end_rot: float = float(lay.get("rot_deg", 0.0))
-		var delay: float = float(i) * base_delay
-		var dur: float = base_dur + float(i) * dur_step
+		created.append(c)
+		dealt += 1
+	if created.is_empty():
+		print("[DEAL_BURST] no cards created")
+		_is_dealing = false
+		return
+	var dur_layout: float = 0.22 + float(hand.get_child_count()) * 0.01
+	hand.call("layout_cards_animated", dur_layout, null)
+	for i in range(created.size()):
+		var c: Control = created[i]
+		var index: int = hand.get_children().find(c)
+		var layout: Dictionary = hand.call("get_layout_for_index", index, hand.get_child_count())
+		var end_pos: Vector2 = layout.get("pos", Vector2.ZERO)
+		var end_rot: float = float(layout.get("rot_deg", 0.0))
+		var dur: float = 0.18 + float(i) * 0.02
 		var dir: Vector2 = end_pos - start_pos
 		var side: float = clampf(dir.x * 0.10, -55.0, 55.0)
-		var lift: float = clampf(160.0 + absf(dir.x) * 0.08, 160.0, 230.0)
+		var lift: float = clampf(160.0 + absf(dir.x) * 0.06, 160.0, 220.0)
 		var mid_pos: Vector2 = (start_pos + end_pos) * 0.5 + Vector2(side, -lift)
 		var over_pos: Vector2 = end_pos + Vector2(0.0, -10.0)
+		var mid_rot: float = end_rot * 0.35
+		var over_rot: float = end_rot * 1.10
 		var d1: float = dur * 0.55
 		var d2: float = dur * 0.25
 		var d3: float = maxf(0.07, dur - d1 - d2)
-		var mid_rot: float = end_rot * 0.35
-		var over_rot: float = end_rot * 1.10
 		var tw := c.create_tween()
 		var p1 := tw.tween_property(c, "position", mid_pos, d1)
-		p1.set_delay(delay)
 		p1.set_trans(Tween.TRANS_QUINT)
 		p1.set_ease(Tween.EASE_OUT)
 		var r1 := tw.parallel().tween_property(c, "rotation_degrees", mid_rot, d1)
-		r1.set_delay(delay)
 		r1.set_trans(Tween.TRANS_QUINT)
 		r1.set_ease(Tween.EASE_OUT)
 		var s1 := tw.parallel().tween_property(c, "scale", Vector2(1.02, 1.00), d1)
-		s1.set_delay(delay)
 		s1.set_trans(Tween.TRANS_QUAD)
 		s1.set_ease(Tween.EASE_OUT)
 		var p2 := tw.tween_property(c, "position", over_pos, d2)
@@ -357,23 +384,11 @@ func deal_cards(amount: int) -> void:
 		var s3 := tw.parallel().tween_property(c, "scale", Vector2.ONE, d3)
 		s3.set_trans(Tween.TRANS_BACK)
 		s3.set_ease(Tween.EASE_OUT)
-		max_end_s = maxf(max_end_s, delay + dur + 0.20)
-		print("[DRAW_BATCH_CARD] i=", i, " id=", id, " idx=", idx, " delay=", delay, " dur=", dur)
-	print("[DRAW_BATCH] start n=", n, " start_count=", start_count, " final_count=", final_count, " deck_left=", deck.size())
-	var t0: int = Time.get_ticks_msec()
-	var wait_ms: int = int(max_end_s * 1000.0)
-	while (Time.get_ticks_msec() - t0) < wait_ms:
-		await get_tree().process_frame
-	for i in range(new_cards.size()):
-		var c2: Control = new_cards[i]
-		if is_instance_valid(c2):
-			c2.scale = Vector2.ONE
-			c2.z_index = 0
-			if c2.has_method("set_dealing"):
-				c2.set_dealing(false)
+		print("[DEAL_BURST] card i=", i, " id=", int(c.get_meta("card_id")), " dur=", dur)
+	await get_tree().create_timer(0.50).timeout
+	_settle_hand_after_deal()
 	_is_dealing = false
-	hand.call("update_cards")
-	print("[DRAW_BATCH] done hand_now=", hand.get_child_count(), " deck_left=", deck.size())
+	print("[DEAL_BURST] done p=", p.owner_id, " dealt=", dealt, " draw_left=", p.draw.size(), " discard=", p.discard.size(), " hand_model=", p.hand.size(), " hand_nodes=", hand.get_child_count())
 
 func discard_one() -> void:
 	if _is_dealing:
@@ -498,6 +513,39 @@ func discard_hand_to_discard(owner_idx: int) -> void:
 	if oi == active_player_idx:
 		_sync_hand_view_from_model()
 
+func shuffle_discard_into_draw(owner_idx: int, allow_when_draw_not_empty: bool = false) -> bool:
+	_ensure_players()
+	var oi: int = clampi(owner_idx, 0, players.size() - 1)
+	var p: PlayerState = players[oi]
+	if p.discard.is_empty():
+		print("[SHUFFLE] blocked: discard empty owner=", oi)
+		return false
+	if not allow_when_draw_not_empty and not p.draw.is_empty():
+		print("[SHUFFLE] blocked: draw not empty owner=", oi, " draw=", p.draw.size())
+		return false
+	var moved: int = p.discard.size()
+	for i in range(p.discard.size()):
+		p.draw.append(p.discard[i])
+	p.discard.clear()
+	p.draw.shuffle()
+	if oi == active_player_idx:
+		_refresh_pile_visuals()
+	print("[SHUFFLE] owner=", oi, " moved=", moved, " draw_now=", p.draw.size())
+	return true
+
+func _pop_draw_card_id(owner_idx: int) -> int:
+	_ensure_players()
+	var oi: int = clampi(owner_idx, 0, players.size() - 1)
+	var p: PlayerState = players[oi]
+	if p.draw.is_empty() and reshuffle_discard_when_empty:
+		shuffle_discard_into_draw(oi, false)
+	if p.draw.is_empty():
+		return -1
+	var id: int = int(p.draw.pop_back())
+	if oi == active_player_idx:
+		_refresh_pile_visuals()
+	return id
+
 func _card_id_to_text(id: int) -> String:
 	if deck_def != null:
 		return deck_def.card_id_to_text(id)
@@ -540,6 +588,76 @@ func _move_card(owner_from: int, zone_from: StringName, owner_to: int, zone_to: 
 	print("[MOVE] id=", moved, " ", owner_from, ":", zone_from, " -> ", owner_to, ":", zone_to, " to_size=", to_pile.size())
 	return moved
 
+func play_last_hand_card() -> void:
+	if _is_dealing:
+		print("[PLAY] blocked: dealing")
+		return
+	if hand == null or play_zone == null:
+		print("[PLAY] blocked: missing hand/play_zone")
+		return
+	var p: PlayerState = _active()
+	var count: int = hand.get_child_count()
+	if count <= 0:
+		return
+	var last := hand.get_child(count - 1) as Control
+	if last == null:
+		return
+	if not last.has_meta("card_id"):
+		print("[PLAY] desync: node missing card_id meta, rebuilding hand view")
+		_sync_hand_view_from_model()
+		return
+	var id: int = int(last.get_meta("card_id"))
+	var idx: int = p.hand.rfind(id)
+	if idx < 0:
+		print("[PLAY] desync: id=", id, " not in model hand, rebuilding hand view")
+		_sync_hand_view_from_model()
+		return
+	p.hand.remove_at(idx)
+	p.in_play.append(id)
+	hand.remove_child(last)
+	play_zone.add_child(last)
+	if hand.has_method("layout_cards_animated"):
+		hand.call("layout_cards_animated", 0.18, null)
+	print("[PLAY] p=", p.owner_id, " id=", id, " in_play=", p.in_play.size(), " hand_model=", p.hand.size(), " hand_nodes=", hand.get_child_count())
+
+func resolve_play_to_discard(owner_idx: int) -> void:
+	_ensure_players()
+	var oi: int = clampi(owner_idx, 0, players.size() - 1)
+	var p: PlayerState = players[oi]
+	var moved: int = 0
+	while not p.in_play.is_empty():
+		var id: int = int(p.in_play.pop_back())
+		p.discard.append(id)
+		moved += 1
+	if oi == active_player_idx:
+		if play_zone != null:
+			var kids: Array[Node] = play_zone.get_children()
+			for i in range(kids.size()):
+				var n: Node = kids[i]
+				play_zone.remove_child(n)
+				n.queue_free()
+		_refresh_pile_visuals()
+	print("[RESOLVE] owner=", oi, " to=discard moved=", moved, " discard_now=", p.discard.size())
+
+func resolve_play_to_exile(owner_idx: int) -> void:
+	_ensure_players()
+	var oi: int = clampi(owner_idx, 0, players.size() - 1)
+	var p: PlayerState = players[oi]
+	var moved: int = 0
+	while not p.in_play.is_empty():
+		var id: int = int(p.in_play.pop_back())
+		p.exile.append(id)
+		moved += 1
+	if oi == active_player_idx:
+		if play_zone != null:
+			var kids: Array[Node] = play_zone.get_children()
+			for i in range(kids.size()):
+				var n: Node = kids[i]
+				play_zone.remove_child(n)
+				n.queue_free()
+		_refresh_pile_visuals()
+	print("[RESOLVE] owner=", oi, " to=exile moved=", moved, " exile_now=", p.exile.size())
+
 func _sync_hand_view_from_model() -> void:
 	if hand == null or card_scene == null:
 		return
@@ -568,10 +686,35 @@ func switch_active_player(new_idx: int) -> void:
 	if _is_dealing:
 		print("[SWITCH] blocked: dealing")
 		return
-	active_player_idx = clampi(new_idx, 0, players.size() - 1)
+	var clamped: int = clampi(new_idx, 0, players.size() - 1)
+	if clamped == active_player_idx:
+		print("[SWITCH] noop active_player_idx=", active_player_idx)
+		return
+	active_player_idx = clamped
 	_sync_hand_view_from_model()
-	print("[SWITCH] active_player_idx=", active_player_idx, " draw=", _active().draw.size(), " discard=", _active().discard.size())
-	
+	_refresh_pile_visuals()
+	var p: PlayerState = _active()
+	var nodes: int = 0
+	if hand != null:
+		nodes = hand.get_child_count()
+	print("[SWITCH] active_player_idx=", active_player_idx, " draw=", p.draw.size(), " discard=", p.discard.size(), " exile=", p.exile.size(), " hand_model=", p.hand.size(), " hand_nodes=", nodes)
+
+func _deck_origin_global() -> Vector2:
+	if deck_visual != null and deck_visual.has_method("get_deal_origin_global"):
+		return deck_visual.call("get_deal_origin_global")
+	if deck_visual != null:
+		return deck_visual.get_global_transform_with_canvas().origin
+	return Vector2.ZERO
+
+func _refresh_pile_visuals() -> void:
+	var p: PlayerState = _active()
+	if deck_visual != null and deck_visual.has_method("set_count"):
+		deck_visual.call("set_count", p.draw.size())
+	if discard_visual != null and discard_visual.has_method("set_count"):
+		discard_visual.call("set_count", p.discard.size())
+	if exile_visual != null and exile_visual.has_method("set_count"):
+		exile_visual.call("set_count", p.exile.size())
+
 func _get_rng() -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
 	if reshuffle_uses_seed:

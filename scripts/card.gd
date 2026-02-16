@@ -131,7 +131,7 @@ func _update_tilt(delta: float) -> void:
 		shadow_mat.set_shader_parameter("x_rot", tilt_current.x * shadow_tilt_mult)
 		shadow_mat.set_shader_parameter("y_rot", tilt_current.y * shadow_tilt_mult)
 
-func _update_velocity_tilt(delta: float) -> void:
+func _update_velocity_tilt(delta: float) -> void: # Tilt card based on its velocity
 	if is_inf(vel_last_global_pos.x):
 		vel_last_global_pos = global_position
 		vel_rot_current = 0.0
